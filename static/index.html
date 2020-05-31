@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <meta charset=utf8>
+  <meta http-equiv="X-UA-Compatible" value="IE=edge">
+  <meta name=viewport content="width=device-width, initial-scale=1">
+  <title>Podcast Private</title>
+  <link href=main.css rel=stylesheet>
+  <script src="https://unpkg.com/vue@2.6.11/dist/vue.js"></script>
+
+  <div id="app" class="app">
+    <div class="pane">
+      <podcast-detail
+        v-if="isPodcastSelected"
+        v-bind:subscription-url="selectedPodcast.subscriptionUrl"
+        v-bind:title="selectedPodcast.title"
+        v-bind:image-url="selectedPodcast.imageUrl"
+        v-bind:authors="selectedPodcast.authors"
+        v-bind:link="selectedPodcast.link"
+        v-bind:description="selectedPodcast.description"
+        v-bind:episodes="selectedPodcast.episodes"
+        v-on:nav-back="goHome"
+        v-on:play-episode="playEpisode"
+        ></podcast-detail>
+      <episode-detail v-else-if="isEpisodeSelected"></episode-detail>
+      <subscription-add
+        v-else-if="isAddSubscription"
+        v-on:nav-back="goHome"
+        v-on:add-sub="addFeed($event)"
+        ></subscription-add>
+      <subscription-list
+        v-else
+        v-bind:subscriptions="subscriptionList"
+        v-on:select-podcast="selectPodcast($event)"
+        ></subscription-list>
+    </div>
+
+    <player-strip
+      v-bind:subscription-icon-url="playingEpisodeData.iconUrl"
+      v-bind:title="playingEpisodeData.title"
+      v-bind:audio-url="playingEpisodeData.audioUrl"
+      ></player-strip>
+    <div class="home-row">
+      <button
+        class="home-row__button"
+        v-on:click="goHome">⌂</button>
+      <button
+        class="home-row__button"
+        v-on:click="goAddFeed">+</button>
+    </div>
+  </div>
+  <script src="main.js"></script>
+</html>
