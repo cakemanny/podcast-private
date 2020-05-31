@@ -15,9 +15,21 @@ Vue.component("subscription-list", {
         class="subscription-list__item"
         v-on:click="$emit('select-podcast', subscription.url)"
       >
-        <img v-bind:href="subscription.imageUrl" alt="icon"/>
-        <h3>{{subscription.title}}</h3>
-        <span v-if="subscription.updated">updated!</span>
+        <img
+          class="subscription-list__item-icon"
+          v-bind:src="subscription.imageUrl"
+          alt="icon"/>
+        <span
+          v-if="subscription.updated"
+          class="subscription-list__item-updated-mark"
+        >
+          <svg width="3em" height="3em">
+            <circle cx="6" cy="6" r="5" stroke="white" stroke-width="1" fill="blue"/>
+          </svg>
+        </span>
+        <h3
+          class="subscription-list__item-title"
+          >{{subscription.title}}</h3>
       </div>
     </div>
   `
@@ -44,10 +56,15 @@ Vue.component("podcast-detail", {
         />
       <div class="podcast-detail__content">
         <div class="podcast-detail__title-block">
-          <h3 class="podcast-detail__title">{{title}}</h3>
-          <img v-bind:href="imageUrl" alt="icon"/>
+          <div class="podcast-detail__title-and-authors">
+            <h3 class="podcast-detail__title">{{title}}</h3>
+            <div class="podcast-detail__authors">{{authors}}</div>
+          </div>
+          <img
+            class="podcast-detail__icon"
+            v-bind:src="imageUrl"
+            alt="icon"/>
         </div>
-        <div class="podcast-detail__authors">{{authors}}</div>
         <a v-bind:href="link" alt="website">🌎</a>
         <div class="podcast-detail__description">
           <!-- TODO: sanitise and turn into html -->
@@ -57,7 +74,7 @@ Vue.component("podcast-detail", {
           <h4>Episodes</h4>
           <episode-overview
             v-for="episode in episodes" v-bind:key="episode.guid"
-            v-bind:date="episode.date"
+            v-bind:date="episode.pubDate"
             v-bind:title="episode.title"
             v-bind:location="episode.location"
             v-bind:completed="episode.completed"
@@ -83,7 +100,10 @@ Vue.component("episode-overview", {
   template: `
     <div class="episode-overview">
       <div class="episode-overview__date">{{date}}</div>
-      <h5 v-on:click="$emit('select-episode')">{{title}}</h5>
+      <h5
+        class="episode-overview__title"
+        v-on:click="$emit('select-episode')"
+        >{{title}}</h5>
       <button
         type="button"
         v-on:click="$emit('play-episode')"
@@ -199,14 +219,20 @@ Vue.component("player-strip", {
         <source v-bind:src="audioUrl"/>
       </audio>
       <div class="player-strip__info-row">
-        <img v-bind:href="subscriptionIconUrl"/>
+        <img
+          class="player-strip__icon"
+          v-bind:src="subscriptionIconUrl"/>
         <span class="player-strip__title">{{title}}</span>
         <button
           v-if="isPlaying"
+          class="player-strip__play-pause"
+          alt="pause"
           v-on:click="pause"
           >II</button>
         <button
           v-else
+          class="player-strip__play-pause"
+          alt="play"
           v-on:click="play"
           v-bind:disabled="!audioUrl"
           >ᐅ</button>
@@ -269,8 +295,10 @@ window.app = new Vue({
         fetch("api/fetch_feed?url=" + encodeURIComponent(sub.url))
           .then(r => r.json())
           .then(
-            parsed_data => {
-              this.fetchedData[sub.url] = parsed_data;
+            parsedData => {
+              this.fetchedData = Object.assign({}, this.fetchedData, {
+                [sub.url]: parsedData
+              });
               // TODO: updated previousPubDate
             },
             err => {
@@ -298,6 +326,7 @@ window.app = new Vue({
     subscriptionList() {
       return this.subscriptions.map(s => {
         const fetchedSub = this.fetchedData[s.url];
+        console.log(fetchedSub);
         const imageUrl =
           fetchedSub && fetchedSub.image ? fetchedSub.image.url : undefined;
         const updated =
@@ -388,7 +417,7 @@ window.app = new Vue({
       fetch("api/fetch_feed?url=" + encodeURIComponent(rssUrl))
         .then(r => r.json())
         .then(
-          parsed_data => {
+          parsedData => {
             if (this.subscriptions.map(s => s.url).includes(rssUrl)) {
               console.log("removing existing");
               this.subscriptions = this.subscriptions.filter(
@@ -397,16 +426,18 @@ window.app = new Vue({
             }
             this.subscriptions.push({
               url: rssUrl,
-              title: parsed_data.title,
-              description: parsed_data.description,
-              previousPubDate: parsed_data.previousPubDate,
+              title: parsedData.title,
+              description: parsedData.description,
+              previousPubDate: parsedData.previousPubDate,
               episodeProgress: {}
             });
             localStorage.podcast_private__subscriptions = JSON.stringify(
               this.subscriptions
             );
 
-            this.fetchedData[rssUrl] = parsed_data;
+            this.fetchedData = Object.assign({}, this.fetchedData, {
+              [rssUrl]: parsedData
+            });
             this.goHome();
           },
           err => {

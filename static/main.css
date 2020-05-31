@@ -13,19 +13,45 @@ body {
   overflow-y: scroll;
 }
 
+.subscription-list {
+  padding: 10px;
+}
 .subscription-list__item {
   display: flex;
-  padding: 5px;
+  margin-bottom: 10px;
+}
+.subscription-list__item-title {
+  margin: 0;
+}
+.subscription-list__item-icon {
+  width: 3em;
+  height: 3em;
+  margin-right: 1ex;
+}
+.subscription-list__item-updated-mark {
+  color: blue;
+  position: fixed;
+  margin-left: calc(3em - 6px);
+  margin-top: -5px;
 }
 
 .podcast-detail__content {
-  padding: 5px;
+  padding: 10px;
 }
 .podcast-detail__title-block {
   display: flex;
 }
-.podcast-detail__title {
+.podcast-detail__title-and-authors {
   flex: 1;
+}
+.podcast-detail__title {
+  margin: 0;
+  margin-bottom: 1ex;
+}
+.podcast-detail__icon {
+  width: 4em;
+  height: 4em;
+  margin-left: 1ex;
 }
 .podcast-detail__authors {
   font-size: small;
@@ -35,16 +61,27 @@ body {
   border-bottom: 1px solid silver;
   padding-top: 5px;
   padding-bottom: 5px;
+  font-size: small;
 }
 
 .episode-overview {
   border-bottom: 1px solid silver;
   padding-top: 5px;
   padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+.episode-overview__date {
+  font-size: x-small;
+  color: grey;
+  margin-bottom: 5px;
+}
+.episode-overview__title {
+  margin: 0;
+  margin-bottom: 10px;
 }
 
 .subscription-add__content {
-  padding: 5px;
+  padding: 10px;
 }
 .subscription-add__label {
   display: flex;
@@ -61,9 +98,23 @@ body {
 .player-strip__info-row {
   display: flex;
   padding: 5px;
+  align-items: center;
+}
+.player-strip__icon {
+  height: 2em;
+  width: 2em;
+  margin-right: 5px;
 }
 .player-strip__title {
   flex: 1;
+  font-size: small;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.player-strip__play-pause {
+  margin-left: 5px;
+  width: calc(1.5ex + 16px);
+  height: calc(1.5ex + 16px);
 }
 .player-strip__progress-bar {
   width: 100%;
@@ -80,13 +131,14 @@ body {
 
 .home-row {
   display: flex;
+  height: calc(2em + 10px);
 }
 .home-row__button {
   flex: 1;
 
   background: unset;
   border: unset;
-  font-size: larger;
+  font-size: 3ex;
 }
 
 .nav-row {
