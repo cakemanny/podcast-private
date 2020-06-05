@@ -38,6 +38,8 @@
       v-bind:subscription-icon-url="playingEpisodeData.iconUrl"
       v-bind:title="playingEpisodeData.title"
       v-bind:audio-url="playingEpisodeData.audioUrl"
+      v-on:episode-completed="markEpisodeCompleted"
+      v-on:position-update="markEpisodeProgress"
       ></player-strip>
     <div class="home-row">
       <button

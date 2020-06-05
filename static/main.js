@@ -1,6 +1,20 @@
 /* global Vue */
 "use strict";
 
+/**
+ * just out of good practise, avoid loading any URLs what aren't https
+ */
+function httpsOrUndefined(givenUrl) {
+  if (givenUrl && givenUrl.startsWith("https://")) {
+    return givenUrl;
+  }
+  if (givenUrl && givenUrl.startsWith("http://")) {
+    // could be worth a shot...
+    return givenUrl.replace("http://", "https://");
+  }
+  return undefined;
+}
+
 Vue.component("subscription-list", {
   props: {
     subscriptions: Array
@@ -97,6 +111,16 @@ Vue.component("episode-overview", {
   data: function() {
     return {};
   },
+  computed: {
+    formattedLocation() {
+      const minutes = Math.floor(this.location / 60);
+      const seconds = Math.floor(this.location % 60);
+      if (seconds < 10) {
+        return `${minutes}:0${seconds}`;
+      }
+      return `${minutes}:${seconds}`;
+    }
+  },
   template: `
     <div class="episode-overview">
       <div class="episode-overview__date">{{date}}</div>
@@ -109,7 +133,7 @@ Vue.component("episode-overview", {
         v-on:click="$emit('play-episode')"
         >Play</button>
       <span v-if="completed">Completed</span>
-      <span v-else>current location: {{location}}</span>
+      <span v-else>current location: {{formattedLocation}}</span>
     </div>
   `
 });
@@ -172,8 +196,11 @@ Vue.component("player-strip", {
       progressPercentage: 0
     };
   },
-  // watch
-  //  - if we watch the url, we could auto load
+  watch: {
+    audioUrl: function() {
+      this.play();
+    }
+  },
   methods: {
     play() {
       const audio = this.$refs.audio;
@@ -196,15 +223,15 @@ Vue.component("player-strip", {
       this.progressPercentage = (100 * audio.currentTime) / audio.duration;
     },
     handleEnded() {
-      // TODO: mark episode as completed
-      console.log("ended");
       this.isPlaying = false;
+      this.$emit("episode-complete");
     },
     onPlay() {
       this.isPlaying = true;
     },
     onPause() {
       this.isPlaying = false;
+      this.$emit("position-update", this.$refs.audio.currentTime);
     }
   },
   template: `
@@ -299,7 +326,7 @@ window.app = new Vue({
               this.fetchedData = Object.assign({}, this.fetchedData, {
                 [sub.url]: parsedData
               });
-              // TODO: updated previousPubDate
+              // TODO: updated lastBuildDate
             },
             err => {
               console.error(err);
@@ -326,13 +353,20 @@ window.app = new Vue({
     subscriptionList() {
       return this.subscriptions.map(s => {
         const fetchedSub = this.fetchedData[s.url];
+        if (!fetchedSub) {
+          return {
+            title: s.title,
+            url: s.url,
+            error: true
+          };
+        }
         console.log(fetchedSub);
+        // might be better just to display the last build date 🤷
+        const updated = fetchedSub.lastBuildDate
+          ? fetchedSub.lastBuildDate !== s.lastBuildDate
+          : false;
         const imageUrl =
-          fetchedSub && fetchedSub.image ? fetchedSub.image.url : undefined;
-        const updated =
-          fetchedSub && fetchedSub.pubDate
-            ? fetchedSub.pubDate !== s.previousPubDate
-            : false;
+          fetchedSub.image && httpsOrUndefined(fetchedSub.image.url);
         return {
           title: s.title,
           url: s.url,
@@ -360,7 +394,7 @@ window.app = new Vue({
           return {
             subscriptionUrl: subscription.url,
             title: subscription.title,
-            imageUrl: fetched.image.url,
+            imageUrl: fetched.image && httpsOrUndefined(fetched.image.url),
             authors: "",
             link: fetched.link,
             description: subscription.description,
@@ -381,9 +415,9 @@ window.app = new Vue({
         for (let item of fetched.items) {
           if (item.guid === this.playingEpisode) {
             return {
-              iconUrl: fetched.image.url,
+              iconUrl: httpsOrUndefined(fetched.image.url),
               title: item.title,
-              audioUrl: item.enclosure.url
+              audioUrl: httpsOrUndefined(item.enclosure.url)
             };
           }
         }
@@ -413,6 +447,61 @@ window.app = new Vue({
       this.playingEpisode = episodeGuid;
     },
 
+    saveToStorage() {
+      localStorage.podcast_private__subscriptions = JSON.stringify(
+        this.subscriptions
+      );
+    },
+
+    markEpisodeProgress(timestamp) {
+      if (this.playingSubscription && this.playingEpisode) {
+        this.subscriptions = this.subscriptions.map(subscription => {
+          if (subscription.url !== this.playingSubscription) {
+            return subscription;
+          }
+
+          const newProgress = Object.assign(
+            {
+              completed: false
+            },
+            subscription.episodeProgress[this.playingEpisode],
+            {
+              location: timestamp
+            }
+          );
+
+          return Object.assign({}, subscription, {
+            episodeProgress: Object.assign({}, subscription.episodeProgress, {
+              [this.playingEpisode]: newProgress
+            })
+          });
+        });
+
+        this.saveToStorage();
+      }
+    },
+
+    markEpisodeCompleted() {
+      if (this.playingSubscription && this.playingEpisode) {
+        this.subscriptions = this.subscriptions.map(subscription => {
+          if (subscription.url !== this.playingSubscription) {
+            return subscription;
+          }
+
+          return Object.assign({}, subscription, {
+            episodeProgress: Object.assign({}, subscription.episodeProgress, {
+              [this.playingEpisode]: {
+                location: 0,
+                completed: true
+              }
+            })
+          });
+        });
+
+        this.saveToStorage();
+      }
+    },
+
     addFeed(rssUrl) {
       fetch("api/fetch_feed?url=" + encodeURIComponent(rssUrl))
         .then(r => r.json())
@@ -428,12 +517,10 @@ window.app = new Vue({
               url: rssUrl,
               title: parsedData.title,
               description: parsedData.description,
-              previousPubDate: parsedData.previousPubDate,
+              lastBuildDate: parsedData.lastBuildDate,
               episodeProgress: {}
             });
-            localStorage.podcast_private__subscriptions = JSON.stringify(
-              this.subscriptions
-            );
+            this.saveToStorage();
 
             this.fetchedData = Object.assign({}, this.fetchedData, {
               [rssUrl]: parsedData
