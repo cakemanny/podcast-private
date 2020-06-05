@@ -10,6 +10,11 @@ async def rss_fetch(request):
         return web.Response(text="url param required", status=400)
 
     feed_url = request.query['url']
+    if not feed_url or not feed_url.startswith('https://'):
+        # Should probably have, way out for localhost...
+        return web.Response(text="feed must use https", status=400)
+
+    # TODO: timeouts, and size limits
     async with aiohttp.ClientSession() as session:
         async with session.get(feed_url) as resp:
             if resp.status != 200:
@@ -23,33 +28,45 @@ async def rss_fetch(request):
             return web.json_response(data)
 
 
+def text_of(possible_element):
+    if possible_element is not None:
+        return possible_element.text
+    return None
+
+
 def convert_to_dict(rss_feed):
     channel = rss_feed.find('channel')
 
     data = {
         'title': channel.find('title').text,
-        'description': channel.find('description').text,
         'link': channel.find('link').text,
-        'pubDate': channel.find('pubDate').text,
-        'lastBuildDate': channel.find('lastBuildDate').text,
+        'description': channel.find('description').text,
+        'pubDate': text_of(channel.find('pubDate')),
+        'lastBuildDate': text_of(channel.find('lastBuildDate')),
     }
 
     image = channel.find('image')
     if len(image):
         data['image'] = {
-            'url': image.find('url').text
+            'url': text_of(image.find('url'))
         }
 
     items = []
     for item in channel.iterfind('item'):
+        # technically all of these are optional, but we need some of them for
+        # our app to work properly
         enclosure = item.find('enclosure')
+        title = item.find('title')
+        guid = item.find('guid')
+        if title is None or enclosure is None or guid is None:
+            continue
         items.append({
-            'title': item.find('title').text,
-            'link': item.find('link').text,
-            'description': item.find('description').text,
-            'enclosure': dict(enclosure.attrib) if enclosure is not None else None,
-            'guid': item.find('guid').text,
-            'pubDate': item.find('pubDate').text,
+            'title': title.text,
+            'link': text_of(item.find('link')),
+            'description': text_of(item.find('description')),
+            'enclosure': dict(enclosure.attrib),
+            'guid': guid.text,
+            'pubDate': text_of(item.find('pubDate')),
         })
     data['items'] = items
     return data
