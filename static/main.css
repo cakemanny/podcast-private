@@ -163,6 +163,57 @@ body {
   background-color: blue;
 }
 
+.expanded-player {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+}
+.expanded-player__panel {
+  position: relative;
+  top: 20px;
+  width: calc(100% - 40px);
+  height: calc(100vh - 20px);
+  background: white;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+.expanded-player__icon {
+  width: 10em;
+  height: 10em;
+}
+.expanded-player__travel-buttons {
+  display: flex;
+  width: 100%;
+  justify-content: space-evenly;
+}
+.expanded-player__progress {
+  width: 100%;
+  margin: 10px 0;
+}
+.expanded-player__progress-bar {
+  width: 100%;
+  height: 5px;
+  margin: 5px 0;
+  background: lightblue;
+}
+.expanded-player__progress-bar-done {
+  height: 100%;
+  background: blue;
+}
+.expanded-player__progress-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: x-small;
+  color: grey;
+}
+
 .home-row {
   display: flex;
   height: calc(2em + 10px);

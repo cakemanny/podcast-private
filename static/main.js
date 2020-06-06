@@ -15,6 +15,15 @@ function httpsOrUndefined(givenUrl) {
   return undefined;
 }
 
+Vue.filter("timestamp", function(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  if (seconds < 10) {
+    return `${minutes}:0${seconds}`;
+  }
+  return `${minutes}:${seconds}`;
+});
+
 Vue.component("subscription-list", {
   props: {
     subscriptions: Array
@@ -111,16 +120,6 @@ Vue.component("episode-overview", {
   data: function() {
     return {};
   },
-  computed: {
-    formattedLocation() {
-      const minutes = Math.floor(this.location / 60);
-      const seconds = Math.floor(this.location % 60);
-      if (seconds < 10) {
-        return `${minutes}:0${seconds}`;
-      }
-      return `${minutes}:${seconds}`;
-    }
-  },
   template: `
     <div class="episode-overview">
       <div class="episode-overview__date">{{date}}</div>
@@ -134,7 +133,7 @@ Vue.component("episode-overview", {
         v-on:click="$emit('play-episode')"
         >Play</button>
       <span v-if="completed">Completed</span>
-      <span v-else>current location: {{formattedLocation}}</span>
+      <span v-else>current location: {{this.location | timestamp}}</span>
     </div>
   `
 });
@@ -153,15 +152,6 @@ Vue.component("episode-detail", {
     return {};
   },
   computed: {
-    formattedLocation() {
-      const minutes = Math.floor(this.location / 60);
-      const seconds = Math.floor(this.location % 60);
-      if (seconds < 10) {
-        return `${minutes}:0${seconds}`;
-      }
-      return `${minutes}:${seconds}`;
-    },
-
     sanitisedDescription() {
       const allowedTags = [
         "A",
@@ -234,7 +224,7 @@ Vue.component("episode-detail", {
             type="button"
             v-on:click="$emit('play-episode')"
             >Play</button>
-          current location: {{formattedLocation}}
+          current location: {{this.location | timestamp}}
         </div>
         <div class="episode-detail__description">
           <span v-html="sanitisedDescription"></span>
@@ -282,12 +272,20 @@ Vue.component("player-strip", {
   data: function() {
     return {
       isPlaying: false,
-      progressPercentage: 0
+      isExpanded: false,
+
+      duration: 0,
+      currentTime: 0
     };
   },
   watch: {
     audioUrl: function() {
       this.play();
+    }
+  },
+  computed: {
+    progressPercentage() {
+      return (100 * this.currentTime) / this.duration;
     }
   },
   methods: {
@@ -307,13 +305,28 @@ Vue.component("player-strip", {
       /* probably want to emit a location as progress */
       this.$refs.audio.pause();
     },
-    handleDurationChange(e) {
-      // TODO
-      console.log(e);
+    seek(time) {
+      const audio = this.$refs.audio;
+      audio.currentTime = time;
+      this.$emit("position-update", this.$refs.audio.currentTime);
+    },
+    backTen() {
+      const audio = this.$refs.audio;
+      audio.currentTime -= 10;
+    },
+    forwardTen() {
+      const audio = this.$refs.audio;
+      audio.currentTime += 10;
+    },
+    handleDurationChange() {
+      const audio = this.$refs.audio;
+      this.currentTime = Math.round(audio.currentTime);
+      this.duration = Math.round(audio.duration);
     },
     handleTimeUpdate() {
       const audio = this.$refs.audio;
-      this.progressPercentage = (100 * audio.currentTime) / audio.duration;
+      this.currentTime = Math.round(audio.currentTime);
+      this.duration = Math.round(audio.duration);
     },
     handleEnded() {
       this.isPlaying = false;
@@ -325,6 +338,12 @@ Vue.component("player-strip", {
     onPause() {
       this.isPlaying = false;
       this.$emit("position-update", this.$refs.audio.currentTime);
+    },
+    expandPlayer() {
+      this.isExpanded = true;
+    },
+    unexpandPlayer() {
+      this.isExpanded = false;
     }
   },
   template: `
@@ -339,7 +358,10 @@ Vue.component("player-strip", {
       >
         <source v-bind:src="audioUrl"/>
       </audio>
-      <div class="player-strip__info-row">
+      <div
+        class="player-strip__info-row"
+        v-on:click="expandPlayer"
+      >
         <img
           class="player-strip__icon"
           v-bind:src="subscriptionIconUrl"/>
@@ -348,13 +370,13 @@ Vue.component("player-strip", {
           v-if="isPlaying"
           class="player-strip__play-pause"
           alt="pause"
-          v-on:click="pause"
+          v-on:click.stop="pause"
           >II</button>
         <button
           v-else
           class="player-strip__play-pause"
           alt="play"
-          v-on:click="play"
+          v-on:click.stop="play"
           v-bind:disabled="!audioUrl"
           >ᐅ</button>
       </div>
@@ -364,9 +386,123 @@ Vue.component("player-strip", {
           v-bind:style="{width: progressPercentage+'%'}"
         ></div>
       </div>
-      <div v-if="false">
-        expandable detailed player
-        independent view
+      <expanded-player
+        v-if="isExpanded"
+        v-bind:subscription-icon-url="subscriptionIconUrl"
+        v-bind:title="title"
+        v-bind:is-playing="isPlaying"
+        v-bind:progress-percentage="progressPercentage"
+        v-bind:current-time="currentTime"
+        v-bind:duration="duration"
+        v-on:dismiss-player="unexpandPlayer"
+        v-on:play-playing="play"
+        v-on:pause-playing="pause"
+        v-on:back-ten="backTen"
+        v-on:forward-ten="forwardTen"
+        v-on:seek-position="seek($event)"
+       />
+    </div>
+  `
+});
+
+Vue.component("expanded-player", {
+  props: {
+    subscriptionIconUrl: String,
+    title: String,
+    podcastTitle: String,
+    isPlaying: Boolean,
+    progressPercentage: Number,
+    currentTime: Number,
+    duration: Number
+  },
+  methods: {
+    seek(e) {
+      console.log(e);
+      var wholeBar = e.target;
+      if (e.target.className !== "expanded-player__progress-bar") {
+        wholeBar = wholeBar.parentNode;
+      }
+      // work out where the click happened
+      var scale = e.offsetX / wholeBar.offsetWidth;
+      var newTime = this.duration * scale;
+      this.$emit("seek-position", newTime);
+      console.log(newTime);
+    }
+  },
+  template: `
+    <div
+      class="expanded-player"
+      v-on:click="$emit('dismiss-player')"
+    >
+      <div class="expanded-player__panel">
+        <img
+          class="expanded-player__icon"
+          v-bind:src="subscriptionIconUrl"/>
+        <h3
+          class="expanded-player__title"
+          >{{title}}</h3>
+        <h4
+          class="expanded-player__podcast-title"
+          >{{podcastTitle}}</h4>
+        <div
+          class="expanded-player__travel-buttons">
+          <button
+            class="expanded-player__back-10"
+            v-on:click.stop="$emit('back-ten')"
+          >back 10s</button>
+          <button
+            v-if="!isPlaying"
+            class="expanded-player__play-pause"
+            v-on:click.stop="$emit('play-playing')"
+          >
+            <svg width="50" height="50" alt="play">
+              <circle cx="25" cy="25" r="20" fill="black"/>
+              <polygon points="20,15 35,25 20,35" style="fill:white"/>
+            </svg>
+          </button>
+          <button
+            v-else
+            class="expanded-player__play-pause"
+            v-on:click.stop="$emit('pause-playing')"
+          >
+            <svg width="50" height="50" alt="pause">
+              <circle cx="25" cy="25" r="20" fill="black"/>
+              <rect x="17.5" y="15" width="5" height="20" fill="white"/>
+              <rect x="27.5" y="15" width="5" height="20" fill="white"/>
+            </svg>
+          </button>
+          <button
+            class="expanded-player__forward-10"
+            v-on:click.stop="$emit('forward-ten')"
+          >forward 10s</button>
+        </div>
+        <div
+          class="expanded-player__progress"
+        >
+          <div
+            class="expanded-player__progress-bar"
+            v-on:click.stop="seek"
+          >
+            <div
+              class="expanded-player__progress-bar-done"
+              v-bind:style="{width: progressPercentage+'%'}"
+            ></div>
+          </div>
+          <div class="expanded-player__progress-times">
+            <div class="expanded-player__progress-so-far">
+              {{currentTime | timestamp}}
+            </div>
+            <div class="expanded-player__progress-remaining">
+              -{{duration - currentTime | timestamp}}
+            </div>
+          </div>
+        </div>
+        <div v-if="false">
+          * speed selector
+        </div>
+        <div >
+          * speed display
+        </div>
       </div>
     </div>
   `
@@ -478,6 +614,9 @@ window.app = new Vue({
       for (let subscription of this.subscriptions) {
         if (subscription.url === this.selectedSubscriptionUrl) {
           const fetched = this.fetchedData[subscription.url];
+          if (!fetched) {
+            return undefined;
+          }
           const episodes = fetched.items.map(item => {
             const progress = subscription.episodeProgress[item.guid] || {
               location: 0,
@@ -566,6 +705,7 @@ window.app = new Vue({
     },
 
     selectPodcast(rssUrl) {
+      // TODO: checked that we have fetched data first
       this.selectedSubscriptionUrl = rssUrl;
       this.selectedEpisodeGuid = "";
       this.view = "subscription";
