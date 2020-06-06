@@ -80,6 +80,40 @@ body {
   margin-bottom: 10px;
 }
 
+.episode-detail__content {
+  padding: 10px;
+}
+.episode-detail__podcast-title-holder {
+  display: flex;
+}
+.episode-detail__podcast-icon {
+  width: 2em;
+  height: 2em;
+  margin-right: 1ex;
+}
+.episode-detail__podcast-title {
+  flex: 1;
+  margin: 0;
+}
+.episode-detail__title {
+  margin: 0;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+.episode-detail__date {
+  font-size: x-small;
+  color: grey;
+}
+.episode-detail__progress {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.episode-detail__description {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: small;
+}
+
 .subscription-add__content {
   padding: 10px;
 }

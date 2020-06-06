@@ -129,6 +129,7 @@ Vue.component("episode-overview", {
         v-on:click="$emit('select-episode')"
         >{{title}}</h5>
       <button
+        class="episode-overview__play-button"
         type="button"
         v-on:click="$emit('play-episode')"
         >Play</button>
@@ -139,18 +140,106 @@ Vue.component("episode-overview", {
 });
 
 Vue.component("episode-detail", {
-  props: {},
+  props: {
+    title: String,
+    date: String,
+    location: Number,
+    completed: Boolean,
+    description: String,
+    podcastTitle: String,
+    podcastIconUrl: String
+  },
   data: function() {
     return {};
   },
+  computed: {
+    formattedLocation() {
+      const minutes = Math.floor(this.location / 60);
+      const seconds = Math.floor(this.location % 60);
+      if (seconds < 10) {
+        return `${minutes}:0${seconds}`;
+      }
+      return `${minutes}:${seconds}`;
+    },
+
+    sanitisedDescription() {
+      const allowedTags = [
+        "A",
+        "B",
+        "BR",
+        "DIV",
+        // "IMG",
+        "LI",
+        "OL",
+        "P",
+        "SPAN",
+        "STRONG",
+        "U",
+        "UL"
+      ];
+
+      let elem = document.createElement("div");
+      elem.innerHTML = this.description;
+
+      if (elem.firstElementChild === null) {
+        return this.description;
+      }
+
+      let walk = function walk(e, parent) {
+        while (e) {
+          if (e.firstChild) {
+            walk(e.firstChild, e);
+          }
+          // Remove all disallowed nodes
+          if (e.nodeType === 1 && !allowedTags.includes(e.nodeName)) {
+            let toRemove = e;
+            e = e.nextSibling;
+            parent.removeChild(toRemove);
+            continue;
+          }
+          if (e.nodeType === 1) {
+            e.removeAttribute("class");
+            e.removeAttribute("style");
+          }
+          e = e.nextSibling;
+        }
+      };
+      walk(elem.firstChild, elem);
+
+      return elem.innerHTML;
+    }
+  },
   template: `
     <div class="episode-detail">
-      * Date
-      * Podcast Name
-      * Episode Title
-      * Play button
-      * Progress / playcount indicators
-      * Episode description
+      <nav-row
+        title="Episode"
+        v-on:nav-back="$emit('nav-back')"
+        />
+      <div class="episode-detail__content">
+        <div class="episode-detail__podcast-title-holder">
+          <img
+            class="episode-detail__podcast-icon"
+            alt="icon"
+            v-bind:src="podcastIconUrl"/>
+          <h4 class="episode-detail__podcast-title"
+            >{{podcastTitle}}</h4>
+        </div>
+        <h3 class="episode-detail__title">
+          {{title}}
+        </h3>
+        <div class="episode-detail__date">{{date}}</div>
+        <div class="episode-detail__progress">
+          <button
+            class="episode-detail__play-button"
+            type="button"
+            v-on:click="$emit('play-episode')"
+            >Play</button>
+          current location: {{formattedLocation}}
+        </div>
+        <div class="episode-detail__description">
+          <span v-html="sanitisedDescription"></span>
+        </div>
+      </div>
     </div>
   `
 });
@@ -218,6 +307,10 @@ Vue.component("player-strip", {
       /* probably want to emit a location as progress */
       this.$refs.audio.pause();
     },
+    handleDurationChange(e) {
+      // TODO
+      console.log(e);
+    },
     handleTimeUpdate() {
       const audio = this.$refs.audio;
       this.progressPercentage = (100 * audio.currentTime) / audio.duration;
@@ -242,6 +335,7 @@ Vue.component("player-strip", {
         v-on:ended="handleEnded"
         v-on:play="onPlay"
         v-on:pause="onPause"
+        v-on:durationchange="handleDurationChange"
       >
         <source v-bind:src="audioUrl"/>
       </audio>
@@ -299,8 +393,8 @@ window.app = new Vue({
   data: {
     /* view state */
     view: "home",
-    selectedSubscription: "",
-    selectedEpisode: "",
+    selectedSubscriptionUrl: "",
+    selectedEpisodeGuid: "",
 
     /* player state? */
     playingSubscription: "",
@@ -337,13 +431,13 @@ window.app = new Vue({
   },
   computed: {
     isPodcastSelected() {
-      return this.view === "subscription" && this.selectedSubscription;
+      return this.view === "subscription" && this.selectedSubscriptionUrl;
     },
     isEpisodeSelected() {
       return (
         this.view === "episode" &&
-        this.selectedSubscription &&
-        this.selectedEpisode
+        this.selectedSubscriptionUrl &&
+        this.selectedEpisodeGuid
       );
     },
     isAddSubscription() {
@@ -377,12 +471,12 @@ window.app = new Vue({
     },
 
     selectedPodcast() {
-      if (!this.selectedSubscription) {
+      if (!this.selectedSubscriptionUrl) {
         return undefined;
       }
 
       for (let subscription of this.subscriptions) {
-        if (subscription.url === this.selectedSubscription) {
+        if (subscription.url === this.selectedSubscriptionUrl) {
           const fetched = this.fetchedData[subscription.url];
           const episodes = fetched.items.map(item => {
             const progress = subscription.episodeProgress[item.guid] || {
@@ -402,6 +496,40 @@ window.app = new Vue({
           };
         }
       }
+    },
+
+    selectedEpisode() {
+      if (!this.selectedSubscriptionUrl || !this.selectedEpisodeGuid) {
+        return undefined;
+      }
+
+      const subscription = this.subscriptions.filter(
+        s => s.url == this.selectedSubscriptionUrl
+      )[0];
+      if (!subscription) {
+        return undefined;
+      }
+
+      const fetched = this.fetchedData[subscription.url];
+      if (!fetched) {
+        return undefined;
+      }
+      const episode = fetched.items.filter(
+        i => i.guid == this.selectedEpisodeGuid
+      )[0];
+      if (!episode) {
+        return undefined;
+      }
+
+      return Object.assign(
+        { location: 0, completed: false },
+        episode,
+        subscription.episodeProgress[episode.guid],
+        {
+          podcastTitle: subscription.title,
+          podcastIconUrl: fetched.image && httpsOrUndefined(fetched.image.url)
+        }
+      );
     },
 
     playingEpisodeData() {
@@ -428,18 +556,25 @@ window.app = new Vue({
   methods: {
     goHome() {
       this.view = "home";
-      this.selectedSubscription = "";
-      this.selectedEpisode = "";
+      this.selectedSubscriptionUrl = "";
+      this.selectedEpisodeGuid = "";
     },
     goAddFeed() {
       this.view = "add_subscription";
-      this.selectedSubscription = "";
-      this.selectedEpisode = "";
+      this.selectedSubscriptionUrl = "";
+      this.selectedEpisodeGuid = "";
     },
 
     selectPodcast(rssUrl) {
-      this.selectedSubscription = rssUrl;
+      this.selectedSubscriptionUrl = rssUrl;
+      this.selectedEpisodeGuid = "";
       this.view = "subscription";
+    },
+
+    selectEpisode(rssUrl, episodeGuid) {
+      this.selectedSubscriptionUrl = rssUrl;
+      this.selectedEpisodeGuid = episodeGuid;
+      this.view = "episode";
     },
 
     playEpisode(subscriptionUrl, episodeGuid) {

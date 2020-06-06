@@ -19,9 +19,21 @@
         v-bind:description="selectedPodcast.description"
         v-bind:episodes="selectedPodcast.episodes"
         v-on:nav-back="goHome"
+        v-on:select-episode="selectEpisode"
         v-on:play-episode="playEpisode"
         ></podcast-detail>
-      <episode-detail v-else-if="isEpisodeSelected"></episode-detail>
+      <episode-detail
+        v-else-if="isEpisodeSelected"
+        v-bind:title="selectedEpisode.title"
+        v-bind:date="selectedEpisode.pubDate"
+        v-bind:location="selectedEpisode.location"
+        v-bind:completed="selectedEpisode.completed"
+        v-bind:description="selectedEpisode.description"
+        v-bind:podcast-title="selectedEpisode.podcastTitle"
+        v-bind:podcast-icon-url="selectedEpisode.podcastIconUrl"
+        v-on:nav-back="selectPodcast(selectedSubscriptionUrl)"
+        v-on:play-episode="playEpisode(selectedSubscriptionUrl, selectedEpisodeGuid)"
+        ></episode-detail>
       <subscription-add
         v-else-if="isAddSubscription"
         v-on:nav-back="goHome"
