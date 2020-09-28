@@ -549,19 +549,17 @@ window.app = new Vue({
       // update subs from the localStorage
       this.subscriptions = saved_subs;
       saved_subs.forEach(sub => {
-        fetch("api/fetch_feed?url=" + encodeURIComponent(sub.url))
-          .then(r => r.json())
-          .then(
-            parsedData => {
-              this.fetchedData = Object.assign({}, this.fetchedData, {
-                [sub.url]: parsedData
-              });
-              // TODO: updated lastBuildDate
-            },
-            err => {
-              console.error(err);
-            }
-          );
+        this.fetchFeed(sub.url).then(
+          parsedData => {
+            this.fetchedData = Object.assign({}, this.fetchedData, {
+              [sub.url]: parsedData
+            });
+            // TODO: updated lastBuildDate
+          },
+          err => {
+            console.error(err);
+          }
+        );
       });
     }
   },
@@ -777,36 +775,95 @@ window.app = new Vue({
       }
     },
 
-    addFeed(rssUrl) {
-      fetch("api/fetch_feed?url=" + encodeURIComponent(rssUrl))
-        .then(r => r.json())
-        .then(
-          parsedData => {
-            if (this.subscriptions.map(s => s.url).includes(rssUrl)) {
-              console.log("removing existing");
-              this.subscriptions = this.subscriptions.filter(
-                s => s.url !== rssUrl
-              );
+    fetchFeed(rssUrl) {
+      function convertItemElem(itemElem) {
+        let result = {
+          enclosure: {}
+        };
+        for (let child of itemElem.children) {
+          if (child.tagName == "enclosure") {
+            for (let attr of child.getAttributeNames()) {
+              result.enclosure[attr] = child.getAttribute(attr);
             }
-            this.subscriptions.push({
-              url: rssUrl,
-              title: parsedData.title,
-              description: parsedData.description,
-              lastBuildDate: parsedData.lastBuildDate,
-              episodeProgress: {}
-            });
-            this.saveToStorage();
-
-            this.fetchedData = Object.assign({}, this.fetchedData, {
-              [rssUrl]: parsedData
-            });
-            this.goHome();
-          },
-          err => {
-            console.error(err);
-            this.goHome();
+          } else if (
+            ["title", "link", "description", "guid", "pubDate"].includes(
+              child.tagName
+            )
+          ) {
+            result[child.tagName] = child.textContent;
           }
-        );
+        }
+        if (!result.enclosure.url || !result.title || !result.guid) {
+          return undefined;
+        }
+        return result;
+      }
+
+      return fetch("https://cors-anywhere.herokuapp.com/" + rssUrl)
+        .then(r => r.text())
+        .then(xmlString => {
+          let parser = new DOMParser();
+          let doc = parser.parseFromString(xmlString, "application/xml");
+
+          let channel = doc.documentElement.firstElementChild;
+
+          let result = {
+            items: []
+          };
+
+          for (let elem of channel.children) {
+            if (elem.tagName === "item") {
+              let item = convertItemElem(elem);
+              if (item) {
+                result.items.push(item);
+              }
+            } else if (elem.tagName === "image") {
+              for (let urlTag of elem.getElementsByTagName("url")) {
+                result["image"] = {
+                  url: urlTag.textContent
+                };
+              }
+            } else if (
+              ["title", "description", "pubDate", "lastBuildDate"].includes(
+                elem.tagName
+              )
+            ) {
+              result[elem.tagName] = elem.textContent;
+            }
+          }
+
+          return result;
+        });
+    },
+
+    addFeed(rssUrl) {
+      this.fetchFeed().then(
+        parsedData => {
+          if (this.subscriptions.map(s => s.url).includes(rssUrl)) {
+            console.log("removing existing");
+            this.subscriptions = this.subscriptions.filter(
+              s => s.url !== rssUrl
+            );
+          }
+          this.subscriptions.push({
+            url: rssUrl,
+            title: parsedData.title,
+            description: parsedData.description,
+            lastBuildDate: parsedData.lastBuildDate,
+            episodeProgress: {}
+          });
+          this.saveToStorage();
+
+          this.fetchedData = Object.assign({}, this.fetchedData, {
+            [rssUrl]: parsedData
+          });
+          this.goHome();
+        },
+        err => {
+          console.error(err);
+          this.goHome();
+        }
+      );
     }
   }
 });
