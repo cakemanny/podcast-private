@@ -799,8 +799,22 @@ window.app = new Vue({
         return result;
       }
 
+      if (!rssUrl) {
+        return Promise.reject("rssUrl is undefined or blank: " + rssUrl);
+      }
+      try {
+        new URL(rssUrl);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+
       return fetch("https://cors-anywhere.herokuapp.com/" + rssUrl)
-        .then(r => r.text())
+        .then(r => {
+          if (!r.ok) {
+            return Promise.reject("Request for rss feed failed");
+          }
+          return r.text();
+        })
         .then(xmlString => {
           let parser = new DOMParser();
           let doc = parser.parseFromString(xmlString, "application/xml");
@@ -828,6 +842,7 @@ window.app = new Vue({
                 elem.tagName
               )
             ) {
+              console.log();
               result[elem.tagName] = elem.textContent;
             }
           }
@@ -837,7 +852,7 @@ window.app = new Vue({
     },
 
     addFeed(rssUrl) {
-      this.fetchFeed().then(
+      this.fetchFeed(rssUrl).then(
         parsedData => {
           if (this.subscriptions.map(s => s.url).includes(rssUrl)) {
             console.log("removing existing");
@@ -860,6 +875,7 @@ window.app = new Vue({
           this.goHome();
         },
         err => {
+          // TODO: show an actual message!
           console.error(err);
           this.goHome();
         }
