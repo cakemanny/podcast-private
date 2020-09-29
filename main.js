@@ -842,12 +842,14 @@ window.app = new Vue({
                 elem.tagName
               )
             ) {
-              console.log();
               result[elem.tagName] = elem.textContent;
             }
           }
 
-          return result;
+          if (!result.title || !result.description || !result.link) {
+            return Promise.reject("not a valid podcast feed");
+          }
+          return Promise.resolve(result);
         });
     },
 
