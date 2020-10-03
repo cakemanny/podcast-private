@@ -838,15 +838,23 @@ window.app = new Vue({
                 };
               }
             } else if (
-              ["title", "description", "pubDate", "lastBuildDate"].includes(
-                elem.tagName
-              )
+              [
+                "title",
+                "description",
+                "link",
+                "pubDate",
+                "lastBuildDate"
+              ].includes(elem.tagName)
             ) {
               result[elem.tagName] = elem.textContent;
             }
           }
 
           if (!result.title || !result.description || !result.link) {
+            console.log(rssUrl);
+            !result.title && console.log("title missing");
+            !result.description && console.log("description missing");
+            !result.link && console.log("link missing");
             return Promise.reject("not a valid podcast feed");
           }
           return Promise.resolve(result);
