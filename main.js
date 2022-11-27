@@ -808,7 +808,7 @@ window.app = new Vue({
         return Promise.reject(e);
       }
 
-      return fetch("https://us-central1-fir-project-1fc35.cloudfunctions.net/p/" + btoa(rssUrl))
+      return fetch("https://p-4ib5ccgwja-ew.a.run.app/" + btoa(rssUrl))
         .then(r => {
           if (!r.ok) {
             return Promise.reject("Request for rss feed failed");
